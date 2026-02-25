@@ -10,29 +10,38 @@ from datetime import datetime
 from pathlib import Path
 
 from config import REPORTS_DIR
+from investment_signals import render_signals_markdown
 
 
 def _sentiment_emoji(label: str) -> str:
     return {"positive": "🟢", "negative": "🔴", "neutral": "🟡"}.get(label, "⚪")
 
 
-def generate_report(tiktok_data: dict, reddit_data: dict, x_data: dict = None) -> dict:
-    """Combine TikTok, Reddit, and X data into a single report object."""
+def generate_report(
+    tiktok_data: dict,
+    reddit_data: dict,
+    x_data: dict = None,
+    signals: dict = None,
+) -> dict:
+    """Combine TikTok, Reddit, X, and investment signals into a single report."""
     x_data = x_data or {}
+    signals = signals or {}
     report = {
         "generated_at": datetime.now().isoformat(),
         "date": datetime.now().strftime("%Y-%m-%d"),
         "tiktok": tiktok_data,
         "reddit": reddit_data,
         "x": x_data,
-        "summary": _build_summary(tiktok_data, reddit_data, x_data),
+        "investment_signals": signals,
+        "summary": _build_summary(tiktok_data, reddit_data, x_data, signals),
     }
     return report
 
 
-def _build_summary(tiktok: dict, reddit: dict, x: dict = None) -> dict:
+def _build_summary(tiktok: dict, reddit: dict, x: dict = None, signals: dict = None) -> dict:
     """Plain-English summary of what the scanners found."""
     x = x or {}
+    signals = signals or {}
     summary = {}
 
     # TikTok summary
@@ -75,6 +84,22 @@ def _build_summary(tiktok: dict, reddit: dict, x: dict = None) -> dict:
         ),
     }
 
+    # Investment signals summary
+    public_signals = signals.get("public_tickers", [])
+    private_signals = signals.get("private_to_watch", [])
+    top_signal = public_signals[0] if public_signals else None
+    summary["investment_signals"] = {
+        "status": "ok" if signals and not signals.get("error") else "no data",
+        "total_brands_detected": signals.get("total_brands_detected", 0),
+        "public_ticker_count": len(public_signals),
+        "private_brand_count": len(private_signals),
+        "top_signal": (
+            f"{top_signal['brand'].title()} ({top_signal['ticker']}) — "
+            f"{top_signal['direction']}, score: {top_signal['signal_score']}"
+            if top_signal else "none"
+        ),
+    }
+
     return summary
 
 
@@ -105,6 +130,7 @@ def _render_markdown(report: dict) -> str:
     tiktok = report.get("tiktok", {})
     reddit = report.get("reddit", {})
     x = report.get("x", {})
+    signals = report.get("investment_signals", {})
 
     lines.append(f"# Daily Trend & Economy Report — {date}")
     lines.append(f"*Generated: {generated}*\n")
@@ -115,6 +141,7 @@ def _render_markdown(report: dict) -> str:
     tsum = summary.get("tiktok", {})
     rsum = summary.get("reddit", {})
     xsum = summary.get("x", {})
+    isum = summary.get("investment_signals", {})
 
     if tsum.get("top_hashtags"):
         lines.append(
@@ -147,6 +174,13 @@ def _render_markdown(report: dict) -> str:
             )
     else:
         lines.append(f"**X:** {xsum.get('note', 'No data')}")
+
+    if isum.get("status") == "ok":
+        lines.append(
+            f"**Top Investment Signal:** {isum.get('top_signal', 'none')} | "
+            f"{isum.get('public_ticker_count', 0)} public tickers, "
+            f"{isum.get('private_brand_count', 0)} private brands detected"
+        )
 
     lines.append("")
 
@@ -281,6 +315,44 @@ def _render_markdown(report: dict) -> str:
                     f"{post['replies']:,} replies"
                 )
 
+    # --- Investment Signals Section ---
+    if signals:
+        lines.append(render_signals_markdown(signals))
+    else:
+        lines.append("---\n## Investment Signals\n")
+        lines.append("> No signal data. Run with all scanners enabled.\n")
+
+    # --- TikTok Under-the-Radar ---
+    under_radar = tiktok.get("under_the_radar", [])
+    if under_radar:
+        lines.append("---\n## TikTok: Under-the-Radar (Early Signals)\n")
+        lines.append(
+            "*High engagement ratio but not yet viral — these are the videos "
+            "people are actually excited about before the algorithm pushes them.*\n"
+        )
+        for vid in under_radar[:5]:
+            lines.append(
+                f"- **@{vid['author']}** — {vid['description'][:100]}  \n"
+                f"  {vid['plays']:,} plays | {vid['likes']:,} likes | "
+                f"engagement ratio: {vid['engagement_ratio']:.1%}"
+                + (" 🔥" if vid.get("has_excitement_language") else "")
+            )
+
+    # --- Reddit Consumer Buzz ---
+    consumer_buzz = reddit.get("consumer_buzz", [])
+    if consumer_buzz:
+        lines.append("---\n## Reddit: Consumer Product Buzz\n")
+        lines.append(
+            "*Organic enthusiasm from buy/recommend subreddits — "
+            "real people sharing what they're actually spending money on.*\n"
+        )
+        for post in consumer_buzz[:8]:
+            lines.append(
+                f"- [{post['title']}]({post['url']})  \n"
+                f"  r/{post['subreddit']} | {post['score']:,} upvotes | "
+                f"{post['comments']} comments"
+            )
+
     lines.append("\n---\n*End of report*")
     return "\n".join(lines)
 
@@ -307,5 +379,10 @@ def print_summary(report: dict) -> None:
     print(f"\n[X]       {xsum.get('note', 'No data')}")
     if xsum.get("top_topics"):
         print(f"  AI topics: {', '.join(xsum['top_topics'])}")
+
+    if isum.get("status") == "ok":
+        print(f"\n[SIGNALS] {isum.get('public_ticker_count', 0)} public tickers | "
+              f"{isum.get('private_brand_count', 0)} private brands")
+        print(f"  Top signal: {isum.get('top_signal', 'none')}")
 
     print("=" * 60 + "\n")

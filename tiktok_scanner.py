@@ -1,7 +1,10 @@
 """
 TikTok Trend Scanner
-Pulls trending hashtags, sounds, and video themes from TikTok.
+Pulls trending hashtags, sounds, video themes, and product/brand signals from TikTok.
 Requires ms_token from a logged-in TikTok browser session.
+
+Investment lens: captures early organic excitement around products/brands
+before mainstream financial coverage — the Chris Camillo social arbitrage approach.
 """
 
 import asyncio
@@ -39,6 +42,8 @@ async def scan_tiktok_trends() -> dict:
         "trending_sounds": [],
         "top_themes": [],
         "top_videos": [],
+        "under_the_radar": [],   # high engagement but niche — early signal
+        "acceleration_signals": [],  # suddenly appearing across many videos
         "error": None,
     }
 
@@ -60,14 +65,16 @@ async def scan_tiktok_trends() -> dict:
                 headless=True,
             )
 
-            # --- Trending Hashtags ---
-            logger.info("Fetching trending hashtags...")
+            # --- Fetch trending videos ---
+            logger.info("Fetching trending videos...")
             hashtag_counts = Counter()
             sound_counts = Counter()
             theme_words = []
             top_videos = []
+            # Track hashtags that appear together with excitement language
+            excitement_tags = Counter()
 
-            async for video in api.trending.videos(count=100):
+            async for video in api.trending.videos(count=150):
                 video_data = video.as_dict
 
                 # Collect hashtags
@@ -89,17 +96,49 @@ async def scan_tiktok_trends() -> dict:
                 desc = video_data.get("desc", "")
                 theme_words.extend(extract_themes_from_description(desc))
 
+                # Check for excitement language in descriptions
+                desc_lower = desc.lower()
+                excitement_words = [
+                    "obsessed", "love", "amazing", "game changer", "bought",
+                    "ordered", "must have", "changed my life", "you need",
+                    "everyone needs", "worth it", "underrated", "slept on",
+                    "hidden gem", "actually works", "blowing up", "sold out",
+                ]
+                has_excitement = any(w in desc_lower for w in excitement_words)
+
                 # Top videos by play count
                 stats = video_data.get("stats", {})
                 play_count = stats.get("playCount", 0)
+                like_count = stats.get("diggCount", 0)
+                share_count = stats.get("shareCount", 0)
+
+                # Engagement ratio: likes/plays — high ratio = genuine enthusiasm
+                engagement_ratio = (like_count / play_count) if play_count > 0 else 0
+
+                video_entry = {
+                    "description": desc[:150],
+                    "plays": play_count,
+                    "likes": like_count,
+                    "shares": share_count,
+                    "engagement_ratio": round(engagement_ratio, 4),
+                    "author": video_data.get("author", {}).get("uniqueId", ""),
+                    "has_excitement_language": has_excitement,
+                }
+
                 if play_count > 100_000:
-                    top_videos.append({
-                        "description": desc[:120],
-                        "plays": play_count,
-                        "likes": stats.get("diggCount", 0),
-                        "shares": stats.get("shareCount", 0),
-                        "author": video_data.get("author", {}).get("uniqueId", ""),
-                    })
+                    top_videos.append(video_entry)
+
+                # Under-the-radar: high engagement ratio but lower total plays
+                # These are early signals before they explode
+                if 10_000 < play_count < 500_000 and engagement_ratio > 0.15:
+                    results["under_the_radar"].append(video_entry)
+
+                # Tag excitement hashtags
+                if has_excitement:
+                    for tag in challenges:
+                        title = tag.get("title", "").lower()
+                        if title:
+                            excitement_tags[f"#{title}"] += 1
 
             # Sort and format results
             results["trending_hashtags"] = [
@@ -122,10 +161,24 @@ async def scan_tiktok_trends() -> dict:
                 top_videos, key=lambda x: x["plays"], reverse=True
             )[:10]
 
+            # Acceleration signals: hashtags that appear frequently with excitement language
+            results["acceleration_signals"] = [
+                {"tag": tag, "excited_videos": count}
+                for tag, count in excitement_tags.most_common(10)
+                if count >= 2  # appeared with excitement in multiple videos
+            ]
+
+            results["under_the_radar"] = sorted(
+                results["under_the_radar"],
+                key=lambda x: x["engagement_ratio"],
+                reverse=True,
+            )[:8]
+
             logger.info(
                 f"TikTok scan complete: "
                 f"{len(results['trending_hashtags'])} hashtags, "
-                f"{len(results['top_videos'])} top videos"
+                f"{len(results['top_videos'])} top videos, "
+                f"{len(results['under_the_radar'])} under-the-radar signals"
             )
 
     except ImportError:

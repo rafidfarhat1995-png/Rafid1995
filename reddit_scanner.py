@@ -2,6 +2,9 @@
 Reddit Economy Scanner
 Reads top posts across economic subreddits and surfaces what people
 are actually experiencing — not what the headlines say.
+
+Also scans buy/sell/recommend subreddits for organic product enthusiasm —
+early signals of consumer spending trends before they show up in earnings.
 """
 
 import logging
@@ -18,6 +21,7 @@ from config import (
     ECONOMY_SUBREDDITS,
     ECONOMY_KEYWORDS,
     REDDIT_POST_LIMIT,
+    REDDIT_CONSUMER_SUBREDDITS,
 )
 
 logger = logging.getLogger(__name__)
@@ -57,8 +61,9 @@ def scan_reddit_economy() -> dict:
         "sentiment_by_subreddit": {},
         "top_keywords": [],
         "notable_posts": [],
-        "pain_points": [],      # high-engagement negative posts
-        "green_shoots": [],     # high-engagement positive posts
+        "pain_points": [],          # high-engagement negative posts
+        "green_shoots": [],         # high-engagement positive posts
+        "consumer_buzz": [],        # organic product/brand enthusiasm
         "total_posts_scanned": 0,
         "error": None,
     }
@@ -160,9 +165,37 @@ def scan_reddit_economy() -> dict:
             if p["sentiment"]["label"] == "positive"
         ][:5]
 
+        # --- Consumer Buzz: scan buy/recommend subreddits for product enthusiasm ---
+        logger.info("Scanning consumer subreddits for product buzz...")
+        consumer_posts = []
+        for sub_name in REDDIT_CONSUMER_SUBREDDITS:
+            try:
+                subreddit = reddit.subreddit(sub_name)
+                for post in subreddit.hot(limit=30):
+                    full_text = f"{post.title} {post.selftext}"
+                    sentiment = analyze_text(full_text)
+                    # Only keep positive, high-engagement posts — genuine enthusiasm
+                    if post.score > 100 and sentiment["label"] == "positive":
+                        consumer_posts.append({
+                            "subreddit": sub_name,
+                            "title": post.title,
+                            "score": post.score,
+                            "comments": post.num_comments,
+                            "sentiment": sentiment,
+                            "url": f"https://reddit.com{post.permalink}",
+                        })
+                        results["total_posts_scanned"] += 1
+            except Exception as sub_error:
+                logger.warning(f"Failed to scan r/{sub_name}: {sub_error}")
+                continue
+
+        consumer_posts.sort(key=lambda x: x["score"], reverse=True)
+        results["consumer_buzz"] = consumer_posts[:15]
+
         logger.info(
             f"Reddit scan complete: {results['total_posts_scanned']} posts, "
-            f"overall sentiment: {results['overall_sentiment'].get('label', 'unknown')}"
+            f"overall sentiment: {results['overall_sentiment'].get('label', 'unknown')}, "
+            f"{len(results['consumer_buzz'])} consumer buzz posts"
         )
 
     except Exception as e:

@@ -17,6 +17,7 @@ import schedule
 from tiktok_scanner import run_tiktok_scan
 from reddit_scanner import scan_reddit_economy
 from x_scanner import scan_x_for_ai
+from investment_signals import extract_investment_signals, save_signals
 from report import generate_report, save_report, print_summary
 from config import SCAN_HOUR
 
@@ -29,7 +30,7 @@ logger = logging.getLogger(__name__)
 
 
 def run_scan():
-    """Run a full TikTok + Reddit + X scan and save the report."""
+    """Run a full TikTok + Reddit + X scan with investment signal extraction."""
     logger.info("Starting scan...")
 
     logger.info("Scanning TikTok...")
@@ -41,8 +42,14 @@ def run_scan():
     logger.info("Scanning X for AI updates...")
     x_data = scan_x_for_ai()
 
+    logger.info("Extracting investment signals (Chris Camillo lens)...")
+    signals = extract_investment_signals(tiktok_data, reddit_data, x_data)
+    date_str = datetime.now().strftime("%Y-%m-%d")
+    signals_path = save_signals(signals, date_str)
+    logger.info(f"Signals saved: {signals_path}")
+
     logger.info("Generating report...")
-    report = generate_report(tiktok_data, reddit_data, x_data)
+    report = generate_report(tiktok_data, reddit_data, x_data, signals)
     json_path, md_path = save_report(report)
 
     print_summary(report)

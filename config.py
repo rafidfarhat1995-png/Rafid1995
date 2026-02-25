@@ -59,6 +59,24 @@ ECONOMY_KEYWORDS = [
 # How many posts to pull per subreddit per run
 REDDIT_POST_LIMIT = 50
 
+# Subreddits to mine for organic consumer product/brand enthusiasm
+# These are where people share genuine buying experiences — early investment signals
+REDDIT_CONSUMER_SUBREDDITS = [
+    "BuyItForLife",          # things worth spending money on
+    "femalefashionadvice",   # women's fashion trends
+    "malefashionadvice",     # men's fashion trends
+    "SkincareAddiction",     # beauty/skincare products gaining traction
+    "EatCheapAndHealthy",    # food/beverage trends from budget-conscious buyers
+    "Fitness",               # health/supplement brands getting organic love
+    "running",               # running gear/brands
+    "Sneakers",              # footwear brands
+    "Coffee",                # coffee brands and equipment
+    "mealprep",              # food brands people actually buy
+    "Supplements",           # supplement brands gaining traction
+    "YouShouldKnow",         # under-the-radar products people recommend
+    "lifehacks",             # products solving real problems
+]
+
 # TikTok categories to scan for trends
 TIKTOK_TREND_CATEGORIES = [
     "trending", "foryou", "news", "lifestyle", "money", "food"
