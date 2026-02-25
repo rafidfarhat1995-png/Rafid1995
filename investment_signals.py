@@ -147,7 +147,9 @@ def _extract_brand_mentions(text: str) -> list[tuple[str, str | None]]:
     text_lower = text.lower()
     found = []
     for brand, ticker in BRAND_TICKER_MAP.items():
-        if brand in text_lower:
+        # Use word-boundary matching to avoid partial matches (e.g. "ro" inside "dutch bros")
+        pattern = r'\b' + re.escape(brand) + r'\b'
+        if re.search(pattern, text_lower):
             found.append((brand, ticker))
     return found
 
