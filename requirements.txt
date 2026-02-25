@@ -2,3 +2,5 @@ schedule>=1.2.2
 requests>=2.31.0
 beautifulsoup4>=4.12.0
 lxml>=5.1.0
+TikTokApi>=6.3.0
+playwright>=1.40.0
