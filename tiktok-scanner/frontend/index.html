@@ -1,0 +1,597 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>TikTok Social Arbitrage Scanner</title>
+  <style>
+    :root {
+      --bg: #0a0a0f;
+      --surface: #12121a;
+      --surface2: #1a1a26;
+      --border: #2a2a40;
+      --accent: #7c3aed;
+      --accent2: #06b6d4;
+      --text: #e2e8f0;
+      --muted: #64748b;
+      --green: #10b981;
+      --yellow: #f59e0b;
+      --red: #ef4444;
+      --viral: #ec4899;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      min-height: 100vh;
+    }
+
+    /* ── Header ── */
+    header {
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      padding: 16px 32px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+
+    .logo {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 1.2rem;
+      font-weight: 700;
+    }
+
+    .logo .tiktok-icon {
+      width: 28px;
+      height: 28px;
+      background: linear-gradient(135deg, #ff0050, #00f2ea);
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 14px;
+    }
+
+    .scan-btn {
+      background: var(--accent);
+      color: white;
+      border: none;
+      padding: 10px 24px;
+      border-radius: 8px;
+      font-size: 0.9rem;
+      font-weight: 600;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      transition: background 0.2s;
+    }
+
+    .scan-btn:hover { background: #6d28d9; }
+    .scan-btn:disabled { background: var(--muted); cursor: not-allowed; }
+
+    .scan-btn .spinner {
+      width: 14px;
+      height: 14px;
+      border: 2px solid rgba(255,255,255,0.3);
+      border-top-color: white;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      display: none;
+    }
+
+    .scan-btn.loading .spinner { display: block; }
+    .scan-btn.loading .btn-text { display: none; }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── Layout ── */
+    main { padding: 32px; max-width: 1400px; margin: 0 auto; }
+
+    /* ── Stats Bar ── */
+    .stats-bar {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 16px;
+      margin-bottom: 32px;
+    }
+
+    .stat-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 20px;
+    }
+
+    .stat-label { font-size: 0.75rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; }
+    .stat-value { font-size: 2rem; font-weight: 700; margin-top: 4px; }
+    .stat-sub { font-size: 0.8rem; color: var(--muted); margin-top: 4px; }
+
+    /* ── Section headers ── */
+    .section-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 16px;
+    }
+
+    .section-title {
+      font-size: 1rem;
+      font-weight: 600;
+      color: var(--text);
+    }
+
+    .badge {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 4px 12px;
+      font-size: 0.75rem;
+      color: var(--muted);
+    }
+
+    /* ── Signals Grid ── */
+    .signals-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(380px, 1fr));
+      gap: 16px;
+      margin-bottom: 40px;
+    }
+
+    .signal-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 20px;
+      transition: border-color 0.2s, transform 0.1s;
+      cursor: default;
+    }
+
+    .signal-card:hover {
+      border-color: var(--accent);
+      transform: translateY(-1px);
+    }
+
+    .signal-card.viral { border-color: var(--viral); }
+    .signal-card.strong { border-color: var(--accent); }
+
+    .signal-top {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      margin-bottom: 12px;
+    }
+
+    .signal-keyword {
+      font-size: 1rem;
+      font-weight: 600;
+      text-transform: capitalize;
+    }
+
+    .strength-badge {
+      font-size: 0.7rem;
+      font-weight: 700;
+      padding: 4px 10px;
+      border-radius: 20px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .strength-viral { background: rgba(236,72,153,0.2); color: var(--viral); border: 1px solid rgba(236,72,153,0.4); }
+    .strength-strong { background: rgba(124,58,237,0.2); color: #a78bfa; border: 1px solid rgba(124,58,237,0.4); }
+    .strength-moderate { background: rgba(245,158,11,0.2); color: var(--yellow); border: 1px solid rgba(245,158,11,0.4); }
+    .strength-weak { background: rgba(100,116,139,0.15); color: var(--muted); border: 1px solid var(--border); }
+
+    .signal-metrics {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 8px;
+      margin-bottom: 14px;
+    }
+
+    .metric {
+      background: var(--surface2);
+      border-radius: 8px;
+      padding: 8px 10px;
+    }
+
+    .metric-label { font-size: 0.65rem; color: var(--muted); text-transform: uppercase; }
+    .metric-value { font-size: 0.9rem; font-weight: 600; margin-top: 2px; }
+
+    .sentiment-positive { color: var(--green); }
+    .sentiment-negative { color: var(--red); }
+    .sentiment-neutral { color: var(--muted); }
+
+    /* ── Tickers ── */
+    .tickers-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      align-items: center;
+    }
+
+    .tickers-label {
+      font-size: 0.7rem;
+      color: var(--muted);
+      margin-right: 4px;
+    }
+
+    .ticker-chip {
+      background: rgba(6,182,212,0.15);
+      color: var(--accent2);
+      border: 1px solid rgba(6,182,212,0.3);
+      border-radius: 6px;
+      padding: 3px 8px;
+      font-size: 0.75rem;
+      font-weight: 700;
+      font-family: monospace;
+    }
+
+    .no-ticker {
+      font-size: 0.75rem;
+      color: var(--muted);
+      font-style: italic;
+    }
+
+    /* ── Score bar ── */
+    .score-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-top: 12px;
+    }
+
+    .score-bar-track {
+      flex: 1;
+      height: 4px;
+      background: var(--border);
+      border-radius: 2px;
+      overflow: hidden;
+    }
+
+    .score-bar-fill {
+      height: 100%;
+      border-radius: 2px;
+      background: linear-gradient(90deg, var(--accent), var(--viral));
+      transition: width 0.8s ease;
+    }
+
+    .score-label {
+      font-size: 0.75rem;
+      color: var(--muted);
+      white-space: nowrap;
+    }
+
+    /* ── Empty State ── */
+    .empty-state {
+      text-align: center;
+      padding: 80px 32px;
+      color: var(--muted);
+      grid-column: 1 / -1;
+    }
+
+    .empty-state .icon { font-size: 3rem; margin-bottom: 16px; }
+    .empty-state h3 { font-size: 1.1rem; color: var(--text); margin-bottom: 8px; }
+    .empty-state p { font-size: 0.875rem; }
+
+    /* ── History Table ── */
+    .history-section { margin-top: 8px; }
+
+    .history-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.85rem;
+    }
+
+    .history-table th {
+      text-align: left;
+      padding: 10px 16px;
+      color: var(--muted);
+      font-size: 0.7rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .history-table td {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .history-table tr:last-child td { border-bottom: none; }
+    .history-table tr:hover td { background: var(--surface2); }
+
+    .sparkline {
+      display: flex;
+      align-items: flex-end;
+      gap: 3px;
+      height: 28px;
+    }
+
+    .spark-bar {
+      width: 6px;
+      border-radius: 2px 2px 0 0;
+      background: var(--accent);
+      min-height: 2px;
+    }
+
+    /* ── Last scan info ── */
+    .last-scan-info {
+      font-size: 0.8rem;
+      color: var(--muted);
+    }
+
+    /* ── Footer ── */
+    footer {
+      text-align: center;
+      padding: 32px;
+      color: var(--muted);
+      font-size: 0.8rem;
+      border-top: 1px solid var(--border);
+      margin-top: 48px;
+    }
+
+    footer a { color: var(--accent2); text-decoration: none; }
+
+    @media (max-width: 768px) {
+      main { padding: 16px; }
+      .stats-bar { grid-template-columns: 1fr 1fr; }
+      .signals-grid { grid-template-columns: 1fr; }
+      header { padding: 12px 16px; }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="logo">
+    <div class="tiktok-icon">▶</div>
+    <span>Social Arbitrage Scanner</span>
+  </div>
+  <div style="display:flex; align-items:center; gap:16px;">
+    <span class="last-scan-info" id="lastScanInfo">No scan yet</span>
+    <button class="scan-btn" id="scanBtn" onclick="runScan()">
+      <div class="spinner"></div>
+      <span class="btn-text">Run Scan</span>
+    </button>
+  </div>
+</header>
+
+<main>
+
+  <!-- Stats Bar -->
+  <div class="stats-bar">
+    <div class="stat-card">
+      <div class="stat-label">Videos Scanned</div>
+      <div class="stat-value" id="statVideos">—</div>
+      <div class="stat-sub">last scan</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Signals Found</div>
+      <div class="stat-value" id="statSignals">—</div>
+      <div class="stat-sub">active trends</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Actionable (Mapped)</div>
+      <div class="stat-value" id="statMapped">—</div>
+      <div class="stat-sub">have ticker mapping</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Top Velocity</div>
+      <div class="stat-value" id="statVelocity">—</div>
+      <div class="stat-sub">views/hour (top signal)</div>
+    </div>
+  </div>
+
+  <!-- Signals -->
+  <div class="section-header">
+    <span class="section-title">Trend Signals</span>
+    <span class="badge" id="signalCount">—</span>
+  </div>
+
+  <div class="signals-grid" id="signalsGrid">
+    <div class="empty-state">
+      <div class="icon">🔍</div>
+      <h3>Ready to scan</h3>
+      <p>Click "Run Scan" to analyze TikTok trending content for social arbitrage signals.</p>
+    </div>
+  </div>
+
+  <!-- History -->
+  <div class="section-header" style="margin-top: 40px;">
+    <span class="section-title">7-Day Trend History</span>
+    <span class="badge">keyword volume</span>
+  </div>
+
+  <div style="background: var(--surface); border: 1px solid var(--border); border-radius: 12px; overflow: hidden;">
+    <table class="history-table" id="historyTable">
+      <thead>
+        <tr>
+          <th>Keyword</th>
+          <th>7d Trend</th>
+          <th>Latest Count</th>
+          <th>7d Change</th>
+        </tr>
+      </thead>
+      <tbody id="historyBody">
+        <tr><td colspan="4" style="text-align:center; color: var(--muted); padding: 40px;">Run a scan to load history</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+</main>
+
+<footer>
+  TikTok Social Arbitrage Scanner &mdash; inspired by <a href="#" onclick="return false;">Chris Camillo</a>'s social arbitrage approach.
+  Mock data mode: replace <code>get_trending_videos()</code> in <code>mock_data.py</code> with the
+  <a href="https://developers.tiktok.com/products/research-api/" target="_blank">TikTok Research API</a>.
+</footer>
+
+<script>
+  const API_BASE = '';  // same origin
+
+  function formatNum(n) {
+    if (n >= 1_000_000) return (n / 1_000_000).toFixed(1) + 'M';
+    if (n >= 1_000) return (n / 1_000).toFixed(1) + 'K';
+    return n.toString();
+  }
+
+  function sentimentClass(s) {
+    return `sentiment-${s}`;
+  }
+
+  function strengthClass(s) {
+    return `strength-${s}`;
+  }
+
+  function renderSignalCard(signal) {
+    const tickersHtml = signal.tickers.length
+      ? signal.tickers.map(t => `<span class="ticker-chip">${t}</span>`).join('')
+      : '<span class="no-ticker">No ticker mapped yet</span>';
+
+    const scoreWidth = Math.min(100, signal.signal_score);
+
+    return `
+      <div class="signal-card ${signal.signal_strength}">
+        <div class="signal-top">
+          <div class="signal-keyword">${signal.keyword}</div>
+          <span class="strength-badge ${strengthClass(signal.signal_strength)}">${signal.signal_strength}</span>
+        </div>
+
+        <div class="signal-metrics">
+          <div class="metric">
+            <div class="metric-label">Views</div>
+            <div class="metric-value">${formatNum(signal.total_views)}</div>
+          </div>
+          <div class="metric">
+            <div class="metric-label">Velocity</div>
+            <div class="metric-value">${formatNum(Math.round(signal.view_velocity))}/hr</div>
+          </div>
+          <div class="metric">
+            <div class="metric-label">Videos</div>
+            <div class="metric-value">${signal.video_count}</div>
+          </div>
+        </div>
+
+        <div class="tickers-row">
+          <span class="tickers-label">TICKER:</span>
+          ${tickersHtml}
+        </div>
+
+        <div class="score-row">
+          <div class="score-bar-track">
+            <div class="score-bar-fill" style="width: ${scoreWidth}%"></div>
+          </div>
+          <span class="score-label">Score: ${signal.signal_score}/100</span>
+        </div>
+      </div>
+    `;
+  }
+
+  function renderSparkline(history) {
+    const counts = history.map(d => d.count);
+    const max = Math.max(...counts, 1);
+    return counts.map(c => {
+      const h = Math.max(4, Math.round((c / max) * 28));
+      return `<div class="spark-bar" style="height:${h}px"></div>`;
+    }).join('');
+  }
+
+  async function loadHistory() {
+    try {
+      const res = await fetch(`${API_BASE}/api/history?days=7`);
+      const data = await res.json();
+
+      const tbody = document.getElementById('historyBody');
+      tbody.innerHTML = '';
+
+      data.forEach(item => {
+        const counts = item.history.map(d => d.count);
+        const latest = counts[counts.length - 1];
+        const first = counts[0];
+        const change = first > 0 ? Math.round(((latest - first) / first) * 100) : 0;
+        const changeColor = change > 0 ? 'var(--green)' : (change < 0 ? 'var(--red)' : 'var(--muted)');
+        const changeStr = change > 0 ? `+${change}%` : `${change}%`;
+
+        tbody.innerHTML += `
+          <tr>
+            <td style="font-weight:500; text-transform:capitalize;">${item.keyword}</td>
+            <td><div class="sparkline">${renderSparkline(item.history)}</div></td>
+            <td>${latest}</td>
+            <td style="color:${changeColor}; font-weight:600;">${changeStr}</td>
+          </tr>
+        `;
+      });
+    } catch (e) {
+      console.error('History load failed:', e);
+    }
+  }
+
+  async function runScan() {
+    const btn = document.getElementById('scanBtn');
+    btn.classList.add('loading');
+    btn.disabled = true;
+
+    try {
+      const res = await fetch(`${API_BASE}/api/scan?limit=120`);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+
+      // Update stats
+      document.getElementById('statVideos').textContent = formatNum(data.videos_scanned);
+      document.getElementById('statSignals').textContent = data.signals_found;
+
+      const mappedCount = data.signals.filter(s => s.tickers.length > 0).length;
+      document.getElementById('statMapped').textContent = mappedCount;
+
+      const topVelocity = data.signals.length
+        ? formatNum(Math.round(data.signals[0].view_velocity))
+        : '—';
+      document.getElementById('statVelocity').textContent = topVelocity;
+
+      document.getElementById('signalCount').textContent = `${data.signals.length} signals`;
+
+      // Render signal cards
+      const grid = document.getElementById('signalsGrid');
+      if (data.signals.length === 0) {
+        grid.innerHTML = `
+          <div class="empty-state">
+            <div class="icon">📉</div>
+            <h3>No signals this scan</h3>
+            <p>Try scanning again — signals vary with each simulated batch.</p>
+          </div>`;
+      } else {
+        grid.innerHTML = data.signals.map(renderSignalCard).join('');
+      }
+
+      // Last scan time
+      const t = new Date(data.scanned_at);
+      document.getElementById('lastScanInfo').textContent =
+        `Last scan: ${t.toLocaleTimeString()} · ${data.videos_scanned} videos`;
+
+      // Reload history
+      await loadHistory();
+
+    } catch (err) {
+      alert('Scan failed: ' + err.message + '\n\nMake sure the backend server is running on port 8000.');
+    } finally {
+      btn.classList.remove('loading');
+      btn.disabled = false;
+    }
+  }
+
+  // Load history on page open
+  loadHistory();
+</script>
+
+</body>
+</html>
