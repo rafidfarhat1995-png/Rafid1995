@@ -16,20 +16,23 @@ def _sentiment_emoji(label: str) -> str:
     return {"positive": "🟢", "negative": "🔴", "neutral": "🟡"}.get(label, "⚪")
 
 
-def generate_report(tiktok_data: dict, reddit_data: dict) -> dict:
-    """Combine TikTok and Reddit data into a single report object."""
+def generate_report(tiktok_data: dict, reddit_data: dict, x_data: dict = None) -> dict:
+    """Combine TikTok, Reddit, and X data into a single report object."""
+    x_data = x_data or {}
     report = {
         "generated_at": datetime.now().isoformat(),
         "date": datetime.now().strftime("%Y-%m-%d"),
         "tiktok": tiktok_data,
         "reddit": reddit_data,
-        "summary": _build_summary(tiktok_data, reddit_data),
+        "x": x_data,
+        "summary": _build_summary(tiktok_data, reddit_data, x_data),
     }
     return report
 
 
-def _build_summary(tiktok: dict, reddit: dict) -> dict:
+def _build_summary(tiktok: dict, reddit: dict, x: dict = None) -> dict:
     """Plain-English summary of what the scanners found."""
+    x = x or {}
     summary = {}
 
     # TikTok summary
@@ -54,6 +57,21 @@ def _build_summary(tiktok: dict, reddit: dict) -> dict:
         "note": reddit.get("error") or (
             f"Economy mood is {overall.get('label', 'unknown').upper()} "
             f"(score: {overall.get('average_compound', 0)})"
+        ),
+    }
+
+    # X summary
+    top_topics = [t["topic"] for t in x.get("trending_topics", [])[:4]]
+    breaking = x.get("breaking_news", [])
+    summary["x"] = {
+        "status": "ok" if not x.get("error") else "error",
+        "top_topics": top_topics,
+        "breaking_count": len(breaking),
+        "posts_scanned": x.get("total_posts_scanned", 0),
+        "note": x.get("error") or (
+            f"{x.get('total_posts_scanned', 0)} posts scanned, "
+            f"{len(breaking)} breaking items, "
+            f"top topics: {', '.join(top_topics) if top_topics else 'none'}"
         ),
     }
 
@@ -86,6 +104,7 @@ def _render_markdown(report: dict) -> str:
     summary = report.get("summary", {})
     tiktok = report.get("tiktok", {})
     reddit = report.get("reddit", {})
+    x = report.get("x", {})
 
     lines.append(f"# Daily Trend & Economy Report — {date}")
     lines.append(f"*Generated: {generated}*\n")
@@ -95,6 +114,7 @@ def _render_markdown(report: dict) -> str:
 
     tsum = summary.get("tiktok", {})
     rsum = summary.get("reddit", {})
+    xsum = summary.get("x", {})
 
     if tsum.get("top_hashtags"):
         lines.append(
@@ -114,6 +134,20 @@ def _render_markdown(report: dict) -> str:
         lines.append(
             f"**Top concerns on Reddit:** {', '.join(rsum['top_concerns'])}"
         )
+
+    if xsum.get("status") == "ok":
+        breaking = xsum.get("breaking_count", 0)
+        lines.append(
+            f"**X AI Updates:** {xsum.get('posts_scanned', 0)} posts scanned"
+            + (f" — {breaking} breaking items" if breaking else "")
+        )
+        if xsum.get("top_topics"):
+            lines.append(
+                f"**Hottest AI topics on X:** {', '.join(xsum['top_topics'])}"
+            )
+    else:
+        lines.append(f"**X:** {xsum.get('note', 'No data')}")
+
     lines.append("")
 
     # --- TikTok Section ---
@@ -196,6 +230,57 @@ def _render_markdown(report: dict) -> str:
                     f"{post['comments']} comments"
                 )
 
+    # --- X Section ---
+    lines.append("---\n## X: AI Updates & Breakthroughs\n")
+
+    if x.get("error"):
+        lines.append(f"> ⚠️ {x['error']}\n")
+    elif not x:
+        lines.append("> No X data collected.\n")
+    else:
+        x_sentiment = x.get("overall_sentiment", {})
+        x_mood = x_sentiment.get("label", "unknown")
+        lines.append(
+            f"**AI community mood on X:** {_sentiment_emoji(x_mood)} {x_mood.upper()}  \n"
+            f"Posts scanned: {x.get('total_posts_scanned', 0)} | "
+            f"Excited posts: {x_sentiment.get('excited_posts', 0)} | "
+            f"Concerned posts: {x_sentiment.get('concerned_posts', 0)}\n"
+        )
+
+        if x.get("trending_topics"):
+            lines.append("### What AI Topics Are Trending")
+            for item in x["trending_topics"]:
+                lines.append(f"- **{item['topic']}** — {item['mentions']} mentions")
+
+        if x.get("breaking_news"):
+            lines.append("\n### Breaking (Last 6 Hours)")
+            for post in x["breaking_news"]:
+                lines.append(
+                    f"- **@{post['author']}** — {post['text'][:200]}  \n"
+                    f"  {post['likes']:,} likes | {post['retweets']:,} RTs"
+                )
+
+        if x.get("account_highlights"):
+            lines.append("\n### Notable Posts from Key AI Accounts")
+            for post in x["account_highlights"][:8]:
+                topics_str = ", ".join(post.get("topics", []))
+                lines.append(
+                    f"- **{post['account']}** [{topics_str}]  \n"
+                    f"  {post['text'][:200]}  \n"
+                    f"  {post['likes']:,} likes | {post['retweets']:,} RTs"
+                )
+
+        if x.get("top_posts"):
+            lines.append("\n### Top Posts by Engagement")
+            for i, post in enumerate(x["top_posts"][:5], 1):
+                topics_str = ", ".join(post.get("topics", []))
+                lines.append(
+                    f"{i}. **@{post['author']}** [{topics_str}]  \n"
+                    f"   {post['text'][:200]}  \n"
+                    f"   {post['likes']:,} likes | {post['retweets']:,} RTs | "
+                    f"{post['replies']:,} replies"
+                )
+
     lines.append("\n---\n*End of report*")
     return "\n".join(lines)
 
@@ -205,10 +290,12 @@ def print_summary(report: dict) -> None:
     summary = report.get("summary", {})
     tsum = summary.get("tiktok", {})
     rsum = summary.get("reddit", {})
+    xsum = summary.get("x", {})
 
     print("\n" + "=" * 60)
     print(f"  SCAN COMPLETE — {report['date']}")
     print("=" * 60)
+
     print(f"\n[TIKTOK]  {tsum.get('note', 'No data')}")
     if tsum.get("top_hashtags"):
         print(f"  Tags: {', '.join(tsum['top_hashtags'])}")
@@ -216,5 +303,9 @@ def print_summary(report: dict) -> None:
     print(f"\n[REDDIT]  {rsum.get('note', 'No data')}")
     if rsum.get("top_concerns"):
         print(f"  Top concerns: {', '.join(rsum['top_concerns'])}")
+
+    print(f"\n[X]       {xsum.get('note', 'No data')}")
+    if xsum.get("top_topics"):
+        print(f"  AI topics: {', '.join(xsum['top_topics'])}")
 
     print("=" * 60 + "\n")

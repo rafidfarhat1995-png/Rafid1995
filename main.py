@@ -4,6 +4,7 @@ Main entry point.
 Usage:
   python main.py            # Run one scan immediately
   python main.py --schedule # Run on a nightly schedule (default: 11 PM)
+  python main.py --x-only   # Run only the X AI scanner
 """
 
 import argparse
@@ -15,6 +16,7 @@ import schedule
 
 from tiktok_scanner import run_tiktok_scan
 from reddit_scanner import scan_reddit_economy
+from x_scanner import scan_x_for_ai
 from report import generate_report, save_report, print_summary
 from config import SCAN_HOUR
 
@@ -27,7 +29,7 @@ logger = logging.getLogger(__name__)
 
 
 def run_scan():
-    """Run a full TikTok + Reddit scan and save the report."""
+    """Run a full TikTok + Reddit + X scan and save the report."""
     logger.info("Starting scan...")
 
     logger.info("Scanning TikTok...")
@@ -36,8 +38,11 @@ def run_scan():
     logger.info("Scanning Reddit...")
     reddit_data = scan_reddit_economy()
 
+    logger.info("Scanning X for AI updates...")
+    x_data = scan_x_for_ai()
+
     logger.info("Generating report...")
-    report = generate_report(tiktok_data, reddit_data)
+    report = generate_report(tiktok_data, reddit_data, x_data)
     json_path, md_path = save_report(report)
 
     print_summary(report)
@@ -63,16 +68,28 @@ def run_scheduler():
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
-        description="TikTok & Reddit trend/economy scanner"
+        description="TikTok, Reddit & X trend/economy/AI scanner"
     )
     parser.add_argument(
         "--schedule",
         action="store_true",
         help=f"Run on nightly schedule at {SCAN_HOUR:02d}:00 instead of immediately",
     )
+    parser.add_argument(
+        "--x-only",
+        action="store_true",
+        help="Run only the X AI scanner (quick check)",
+    )
     args = parser.parse_args()
 
     if args.schedule:
         run_scheduler()
+    elif args.x_only:
+        from report import generate_report, save_report, print_summary
+        x_data = scan_x_for_ai()
+        report = generate_report({}, {}, x_data)
+        _, md_path = save_report(report)
+        print_summary(report)
+        logger.info(f"X-only report saved: {md_path}")
     else:
         run_scan()
