@@ -5,7 +5,8 @@
             "command": "npx",
             "args": ["-y", "@claude-plugins-official/telegram"],
             "env": {
-                "TELEGRAM_BOT_TOKEN": "8506294634:AAFZBHS8PJHSHh-yI2nIl3Ma8uajUnA8Ehw"
+                "TELEGRAM_BOT_TOKEN": "8506294634:AAFZBHS8PJHSHh-yI2nIl3Ma8uajUnA8Ehw",
+                "TELEGRAM_CHANNELS": "plugin:telegram@claude-plugins-official"
             }
         }
     }
