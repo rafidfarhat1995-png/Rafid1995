@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>To-Do List</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+  <div class="app">
+    <h1>My To-Do List</h1>
+    <p class="date" id="today-date"></p>
+
+    <!-- Add Task Form -->
+    <div class="form">
+      <input type="text" id="task-input" placeholder="Add a new task..." />
+      <select id="priority">
+        <option value="low">Low</option>
+        <option value="medium" selected>Medium</option>
+        <option value="high">High</option>
+      </select>
+      <input type="date" id="due-date" />
+      <button onclick="addTask()">Add</button>
+    </div>
+
+    <!-- Filter Buttons -->
+    <div class="filters">
+      <button class="filter-btn active" onclick="filterTasks('all', this)">All</button>
+      <button class="filter-btn" onclick="filterTasks('active', this)">Active</button>
+      <button class="filter-btn" onclick="filterTasks('completed', this)">Completed</button>
+    </div>
+
+    <!-- Task List -->
+    <ul id="task-list"></ul>
+
+    <!-- Footer -->
+    <div class="footer">
+      <span id="task-count">0 tasks remaining</span>
+      <button class="clear-btn" onclick="clearCompleted()">Clear Completed</button>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
